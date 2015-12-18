@@ -6,20 +6,10 @@ Created on Thu Dec 17 13:23:31 2015
 """
 
 def persistData(X, label_dados):
-    from sklearn.externals import joblib  
-    import sys
-    print("-----------", file=sys.stderr)
-    print("-----------", file=sys.stderr)
-    print("-----------", file=sys.stderr)
-    print("-----------", file=sys.stderr)
-    print(label_dados, file=sys.stderr)       
-    print("-----------", file=sys.stderr)
-    print("-----------", file=sys.stderr)
-    print("-----------", file=sys.stderr)
-    print("-----------", file=sys.stderr)
-    
+    from sklearn.externals import joblib
+        
     filename = label_dados + '.pkl'
-    joblib.dump(X, filename, compress=3)
+    joblib.dump(X, filename, compress=0)
 
 def hostname():
     """Return the name of the host where the function is being called"""
@@ -70,7 +60,7 @@ def modelSearch(view, data, y, classifiers, cv=3, shuffle=False, random_state=No
 
 def doProcess(clf, label_clf, label_dados, y, train_index, test_index):
     from sklearn.externals import joblib
-    X = joblib.load(label_dados + '.pkl', mode='r+')
+    X = joblib.load(label_dados + '.pkl', mmap_mode='r+')
     
     clf.fit(X[train_index], y[train_index])
     train_score = clf.score(X[train_index], y[train_index])
