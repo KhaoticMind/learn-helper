@@ -5,6 +5,21 @@ Created on Thu Dec 17 13:23:31 2015
 @author: ur57
 """
 
+
+def printProgress(tasks):
+    import numpy as np
+        
+    results = getResults(tasks)
+    
+    res = results.groupby(['label_clf', 'label_dados', 'params'], as_index=False).mean()
+    res = results.groupby(['label_clf', 'label_dados'], as_index=False).max()
+    
+    done = [t.ready() for t in tasks]
+    pct_done = np.mean(done) * 100
+    n_done  = np.sum(done)
+    print("{:d} of {:d} ({:.2f}%)".format(n_done, len(tasks), pct_done) )
+    print(res)
+
 def persistData(X, label_dados):
     from sklearn.externals import joblib
         
@@ -18,7 +33,7 @@ def hostname():
     
 def applyPerHost(directview, func, *args, **kwargs):
     perhost = oneEnginePerHost(directview)
-    perhost.apply(func, *args, **kwargs)
+    perhost.apply_sync(func, *args, **kwargs)
     
 def oneEnginePerHost(client):
     from time import sleep
@@ -35,7 +50,7 @@ def oneEnginePerHost(client):
     one_engine_by_host_ids = list(one_engine_by_host.values())
     return client[one_engine_by_host_ids]
 
-def modelSearch(view, data, y, classifiers, cv=3, shuffle=False, random_state=None):
+def modelSearch(view, data, y, classifiers, cv=3, shuffle=False, random_state=None, metric='acc'):
     '''
     data: Uma lista no formato de tuplas (label_dado, dado)
     classifiers: Uma lista no formado (label_clf, clf, params_dic)
@@ -54,17 +69,29 @@ def modelSearch(view, data, y, classifiers, cv=3, shuffle=False, random_state=No
                 for param in params:                    
                     local_clf = copy(clf)
                     local_clf.set_params(**param)
-                    t = view.apply(doProcess, local_clf, label_clf, label_dados, y, train_index, test_index)
+                    t = view.apply(doProcess, local_clf, label_clf, label_dados, y, train_index, test_index, metric)
                     tasks.append(t)
     return tasks
 
-def doProcess(clf, label_clf, label_dados, y, train_index, test_index):
+def doProcess(clf, label_clf, label_dados, y, train_index, test_index, metric='acc'):
     from sklearn.externals import joblib
+    from sklearn.metrics import  accuracy_score, roc_auc_score
     X = joblib.load(label_dados + '.pkl', mmap_mode='r+')
+
+    y_train = y[train_index]
+    y_test =  y[test_index]            
+    clf.fit(X[train_index], y_train)
     
-    clf.fit(X[train_index], y[train_index])
-    train_score = clf.score(X[train_index], y[train_index])
-    test_score = clf.score(X[test_index], y[test_index])
+    y_train_pred = clf.predict(X[train_index])
+    y_test_pred = clf.predict(X[test_index])
+    
+    if metric == 'auc':
+        train_score = roc_auc_score(y_train, y_train_pred)
+        test_score =  roc_auc_score(y_test, y_test_pred)
+    else: # metric == 'acc':
+        train_score = accuracy_score(y_train, y_train_pred)
+        test_score =  accuracy_score(y_test, y_test_pred)
+        
     pars = clf.get_params()
     pars = frozenset(zip(pars.keys(), pars.values()))
     return (label_clf, pars, label_dados, train_score, test_score)
