@@ -30,16 +30,17 @@ def data_persist(X, label='train', test_size=0.25):
 
 
 def printProgress(tasks):
-    import numpy as np
-
     results = getResults(tasks)
 
-    res = results.groupby(['label_clf', 'label_dados', 'params'], as_index=False).mean()
-    res = res.groupby(['label_clf', 'label_dados'], as_index=False).max()
+    res = results.groupby(['label_clf', 'label_dados', 'params'],
+                          as_index=False).mean()
+    res_idxs = res.groupby(['label_clf', 'label_dados'],
+                           as_index=False)['test_score'].idxmax()
+    res = res.iloc[res_idxs.values, ]
 
-    done = [t.ready() for t in tasks]
-    pct_done = np.mean(done) * 100
-    n_done = np.sum(done)
+    n_done = results.shape[0]
+    pct_done = (n_done / len(tasks)) * 100
+
     print("{:d} of {:d} ({:.2f}%)".format(n_done, len(tasks), pct_done))
     print(res)
 
@@ -100,12 +101,13 @@ def modelSearch(view, data_label, y_label, n_samples, classifiers, cv=3, shuffle
                     local_clf.set_params(**param)
                     t = view.apply(doProcess, local_clf, label_clf,
                                    label_dados, y_label, train_index,
-                                   test_index, metric, fit_params_dict)
+                                   test_index, metric, param, fit_params_dict)
                     tasks.append(t)
     return tasks
 
 
-def doProcess(clf, label_clf, label_dados, y_label, train_index, test_index, metric='acc', fit_params_dict=None):
+def doProcess(clf, label_clf, label_dados, y_label, train_index, test_index,
+              metric='acc', params_dict=None, fit_params_dict=None):
     from sklearn.externals import joblib
     from sklearn.metrics import accuracy_score, roc_auc_score
 
@@ -114,7 +116,11 @@ def doProcess(clf, label_clf, label_dados, y_label, train_index, test_index, met
 
     y_train = y[train_index]
     y_test = y[test_index]
-    clf.fit(X[train_index], y_train)
+
+    if fit_params_dict is None:
+        clf.fit(X[train_index], y_train)
+    else:
+        clf.fit(X[train_index], y_train, **fit_params_dict)
 
     y_train_pred = clf.predict(X[train_index])
     y_test_pred = clf.predict(X[test_index])
@@ -126,10 +132,11 @@ def doProcess(clf, label_clf, label_dados, y_label, train_index, test_index, met
         train_score = accuracy_score(y_train, y_train_pred)
         test_score = accuracy_score(y_test, y_test_pred)
 
-    if fit_params_dict is None:
+    if params_dict is None:
         params = clf.get_params()
     else:
-        params = fit_params_dict
+        params = params_dict
+
     params = frozenset(zip(params.keys(), params.values()))
     return (label_clf, params, label_dados, train_score, test_score)
 
@@ -137,8 +144,10 @@ def getResults(tasks):
     import pandas as pd
     res = []
     for t in tasks:
-        if t.ready():
-            res.append(t.get())
+        try:
+            if t.ready():
+                res.append(t.get())
+        except:
+            pass
 
     return pd.DataFrame(res, columns = ['label_clf', 'params', 'label_dados', 'train_score', 'test_score'])
-
