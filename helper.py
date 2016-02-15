@@ -5,6 +5,53 @@ Created on Thu Dec 17 13:23:31 2015
 @author: ur57
 """
 
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import LinearSVC, SVC
+from xgboost import XGBClassifier, XGBRegressor
+
+import numpy as np
+
+rf_clf = RandomForestClassifier(n_estimators=100)
+params_rf = {'criterion': ['gini', 'entropy'],
+             'oob_score': [True, False],
+             'max_features': ['sqrt', 'log2']}
+clf_rf = ('rf', rf_clf, params_rf, None)
+
+lsvc_clf = LinearSVC()
+params_lsvc = {'C': np.logspace(-3, 2, num=5),
+               'tol': np.logspace(-6, -2, num=5)}
+clf_lsvc = ('lsvc', lsvc_clf, params_lsvc, None)
+
+knn_clf = KNeighborsClassifier()
+params_knn = {'n_neighbors': np.linspace(5, 50, 5),
+              'p': np.linspace(1, 5, 5),
+              'algorithm': ['ball_tree', 'kd_tree', 'brute']}
+clf_knn = ('knn', knn_clf, params_knn, None)
+
+svm_clf = SVC()
+params_svm = {'C': np.logspace(-3, 2, num=5),
+              'gamma': np.logspace(-6, -2, num=5),
+              'tol': np.logspace(-6, -2, num=5),
+              'shrinking': [True, False]}
+clf_svm = ('svm', svm_clf, params_svm, None)
+
+xgb_clf = XGBClassifier(nthread=1)
+params_xgb = {'max_depth': np.linspace(3, 15, 5),
+              'learning_rate': np.linspace(0.001, 0.1, 5),
+              'subsample': np.linspace(0.1, 0.9, 5),
+              'colsample_bytree': np.linspace(0.1, 0.9, 5)}
+fit_params_xgb = {'eval_metric': 'auc'}
+clf_xgb = ('xgb', xgb_clf, params_xgb, fit_params_xgb)
+
+
+xgb_reg = XGBRegressor(nthread=1)
+params_xgb = {'max_depth': np.linspace(3, 15, 5),
+              'learning_rate': np.linspace(0.001, 0.1, 5),
+              'subsample': np.linspace(0.1, 0.9, 5),
+              'colsample_bytree': np.linspace(0.1, 0.9, 5)}
+fit_params_xgb = {'eval_metric': 'rmse'}
+reg_xgb = ('xgb', xgb_reg, params_xgb, fit_params_xgb)
 
 def data_load(label='train'):
     from sklearn.externals import joblib
